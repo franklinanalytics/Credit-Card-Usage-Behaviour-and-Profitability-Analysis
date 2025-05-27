@@ -6,7 +6,7 @@
 2. [Objectives](#objectives)
 3. [Business Context & Case Study](#business-context--case-study)
 4. [Project Structure](#project-structure)
-5. [Schema Design](schema-design)
+5. [Schema Design](#schema-design)
 6. [Tables Preview](#tables-preview)
 7. [Key Queries & Insights](#key-queries--insights)
 8. [Recommendations](#recommendations)
