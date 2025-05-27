@@ -6,11 +6,11 @@
 2. [Objectives](#objectives)
 3. [Business Context & Case Study](#business-context--case-study)
 4. [Project Structure](#project-structure)
-5. [Schema Design & Visuals](#schema-design)
-6. [Key Queries & Insights](#key-queries--insights)
-7. [Recommendations](#recommendations)
-8. [Visuals](#visuals)
-9. [How to Reproduce](#how-to-reproduce)
+5. [Schema Design](schema-design)
+6. [Tables Preview](#tables-preview)
+7. [Key Queries & Insights](#key-queries--insights)
+8. [Recommendations](#recommendations)
+9. [Setup Instructions](#setup-instructions)
 10. [Author](#author)
 
 ---
@@ -60,7 +60,8 @@ This analysis provides answers using clean, structured SQL logic grounded in rea
 │   ├── repayments.csv
 │   └── cards.csv
 ```
-## 🧱 Schema Design
+---
+## Schema Design
 
 **Tables Used:**
 
@@ -71,21 +72,14 @@ This analysis provides answers using clean, structured SQL logic grounded in rea
 
 Each table is connected via `customer_id` and `card_id` as appropriate.
 
-## 🖼️ Visuals
-
-| Customers Table                  | Transactions Table                     | Repayments Table                   |
-| -------------------------------- | -------------------------------------- | ---------------------------------- |
-| ![Customers](customer_table.png) | ![Transactions](transaction_table.png) | ![Repayments](repayment_table.png) |
-
 ---
-
-## 🧾 Data Tables Preview
+## Tables Preview
 
 <table>
   <tr>
-    <td><img src="screenshots/customer_table.png" width="250"></td>
-    <td><img src="screenshots/transaction_table.png" width="250"></td>
-    <td><img src="screenshots/repayment_table.png" width="250"></td>
+    <td><img src="screenshots/customer_table.png" width="300"></td>
+    <td><img src="screenshots/transactions_table.png" width="300"></td>
+    <td><img src="screenshots/repayment_table.png" width="300"></td>
   </tr>
   <tr>
     <td align="center">Customer Table</td>
@@ -96,7 +90,7 @@ Each table is connected via `customer_id` and `card_id` as appropriate.
 
 ---
 
-## 🧠 Key Insights
+## Key Insights
 
 ### Card Usage Behavior
 
@@ -176,10 +170,17 @@ JOIN customers c ON t.customer_id = c.customer_id
 GROUP BY income_level, year
 ORDER BY income_level, year;
 ```
+---
+## Recommendations
+
+* **Offer Premium Upgrades**: Target high-spending, credit-worthy, on-time payers for Platinum upgrade.
+* **Risk Management**: Review credit limits or apply stricter controls in regions with >30% late payments.
+* **Customer Education**: Deploy campaigns in regions with low repayment performance.
+* **Channel Optimization**: Invest more in mobile and POS channels where young customers dominate.
 
 ---
 
-## ⚙️ Setup Instructions
+## Setup Instructions
 
 1. **Run the schema**
 
@@ -202,15 +203,13 @@ ORDER BY income_level, year;
 * Screenshots from database table previews
 
 ---
+## Author
 
-## 🧑‍💼 Author
-
-**Durueke Franklin**
-Data Analyst | Finance-focused Analytics | Portfolio-ready Projects
-
+**Franklin Durueke**
+* Data Analyst | Financial Analysis | Business Intelligence
 📧 [duruekefranklin@gmail.com](mailto:duruekefranklin@gmail.com)
-🔗 [LinkedIn](https://linkedin.com/in/duruekefranklin)
-💼 [GitHub Portfolio](https://github.com/DuruekeFranklin)
+🔗 [LinkedIn](https://www.linkedin.com/in/franklinanalytics/)
+💼 [Portfolio](https://franklinanalytics.github.io/portfolio/)
 
 ---
 
@@ -218,9 +217,9 @@ Data Analyst | Finance-focused Analytics | Portfolio-ready Projects
 
 This analysis simulates a robust financial analytics use case involving behavior segmentation, credit risk evaluation, and profitability analysis. It can be extended into dashboard development, ML credit scoring, or campaign recommendation systems.
 
+> 💬 *Feel free to fork, reuse, or contribute to this repository. Feedback and collaboration are welcome!*
 
-
-
+---
 
 ## 🔍 Key Queries & Insights
 
@@ -297,35 +296,3 @@ GROUP BY card_type
 ORDER BY avg_profit DESC;
 ```
 
-## ✅ Recommendations
-
-* **Offer Premium Upgrades**: Target high-spending, credit-worthy, on-time payers for Platinum upgrade.
-* **Risk Management**: Review credit limits or apply stricter controls in regions with >30% late payments.
-* **Customer Education**: Deploy campaigns in regions with low repayment performance.
-* **Channel Optimization**: Invest more in mobile and POS channels where young customers dominate.
-
-
-
-## 🧪 How to Reproduce
-
-1. Clone the repository
-
-```bash
-git clone https://github.com/franklinanalytics/Credit-Card-Behavior-Analysis.git
-cd Credit-Card-Behavior-Analysis
-```
-
-2. Import the `schema_setup.sql` file into your PostgreSQL or pgAdmin environment
-3. Run the queries from `queries.sql`
-4. Review visuals and insights
-
-## 👤 Author
-
-**Franklin Durueke**
-Data Analyst | Financial Analysis | Business Intelligence
-🔗 [LinkedIn](https://www.linkedin.com/in/franklinanalytics/)
-📫 [franklinanalytics@gmail.com](mailto:franklinanalytics@gmail.com)
-
----
-
-> 💬 *Feel free to fork, reuse, or contribute to this repository. Feedback and collaboration are welcome!*
