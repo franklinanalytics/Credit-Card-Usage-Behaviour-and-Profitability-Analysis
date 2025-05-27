@@ -90,13 +90,13 @@ Each table is connected via `customer_id` and `card_id` as appropriate.
 
 ---
 
-## Key Insights
+## Key Queries & Insights
 
 ### Card Usage Behavior
 
-1. **Spending Patterns by Income Level & Region**
+## 1. **Spending Patterns by Income Level & Region**
 
-   * Higher income groups in urban regions tend to spend more and transact more frequently.
+   * Analyzes total and average transaction values across regions and income groups to understand how wealth and location affect card usage.
 ```sql
 SELECT
     c.income_level,
@@ -110,54 +110,289 @@ GROUP BY c.income_level, c.region
 ORDER BY c.income_level, c.region, total_spent DESC;
 ```
 
-2. **Most Used Channel by Card Type & Age Group**
+## 2. **Most Used Channel by Card Type & Age Group**
 
-   * Younger customers (18–35) prefer digital channels for credit usage, especially with Platinum cards.
+   * Identifies whether mobile, POS, or online channels dominate usage by demographic – informing digital investment strategy.
+```sql
+SELECT 
+	t.channel,
+	cu.age_group,
+	ca.card_type,
+	COUNT(transaction_id) AS total_transactions,
+	cu.region
+FROM transactions t
+JOIN customers cu ON t.customer_id = cu.customer_id
+JOIN cards ca ON t.card_id = ca.card_id
+GROUP BY cu.age_group, ca.card_type, t.channel, cu.region
+ORDER BY total_transactions DESC;
+```
+## 3. **Transaction Size & Frequency by Segment**
 
-3. **Transaction Size & Frequency by Segment**
+   * Evaluates how frequently different segments transact and how much they spend, supporting segmentation.
+```sql
+SELECT
+    c.income_level,
+    c.age_group,
+    c.region,
+    t.customer_id,
+    COUNT(t.transaction_id) AS transaction_frequency,
+    ROUND(AVG(t.amount), 2) AS avg_transaction_size
+FROM transactions t
+JOIN customers c ON t.customer_id = c.customer_id
+GROUP BY c.income_level, c.age_group, c.region, t.customer_id
+ORDER BY c.income_level, c.age_group, c.region, transaction_frequency DESC;
+```
+* Medium-income customers showed higher average transaction sizes despite fewer total transactions.
 
-   * Medium-income customers showed higher average transaction sizes despite fewer total transactions.
+---
 
 ### Repayment Behavior
 
-4. **Late Payers**
+## 4. **Repeated Late Payments**
 
-   * 18.2% of customers have missed 3+ due dates, posing a credit risk.
+  * Flags customers who miss due dates 3+ times – a credit risk metric used by lending teams.
+```sql
+WITH late_payments AS (
+	SELECT 
+		customer_id,
+		COUNT(*) AS late_count
+	FROM repayments
+	WHERE repayment_date > due_date
+	GROUP BY customer_id
+)
+SELECT
+    COUNT(*) FILTER (WHERE late_count >= 3) AS customers_missed_3plus,
+    COUNT(*) AS total_customers,
+    ROUND(
+        100.0 * COUNT(*) FILTER (WHERE late_count >= 3) / COUNT(*), 2
+    ) AS percent_missed_3plus
+FROM late_payments;
+```
+* 18.2% of customers have missed 3+ due dates, posing a credit risk.
 
-5. **Repayment Rates by Age Group**
+## 5. **Repayment Rates by Age Group**
 
-   * Customers aged 36–50 have the best repayment consistency.
+   * Benchmarks how well different age brackets repay their dues – e.g., Gen Z vs Gen X.
+```sql
+SELECT
+    c.age_group,
+    ROUND(AVG(r.amount_paid / r.amount_due) * 100, 2) AS avg_repayment_rate_percent
+FROM repayments r
+JOIN customers c ON r.customer_id = c.customer_id
+GROUP BY c.age_group
+ORDER BY avg_repayment_rate_percent DESC;
+```
+* Customers aged 36–50 have the best repayment consistency.
 
-6. **Unpaid Debt Over Time**
+## 6. **Unpaid Debt Over Time**
 
-   * Notable spikes in unpaid debt during mid-year months, suggesting potential seasonal credit strain.
+   * Tracks growing debt month-over-month to assess portfolio risk and liquidity exposure.
+```sql
+SELECT
+	TO_CHAR(DATE_TRUNC('month', due_date), 'YYYY-MM') AS month,
+	SUM(amount_due - amount_paid) AS unpaid_amount
+FROM repayments
+WHERE amount_due > amount_paid
+GROUP BY month
+ORDER BY month;
+```
+* Notable spikes in unpaid debt during mid-year months, suggesting potential seasonal credit strain.
 
 ### Customer Profitability
 
-7. **Top 10 Most Profitable Customers**
+## 7. Customer-Level Profitability - Top 10 Most Profitable Customers
 
+   * Tracks growing debt month-over-month to assess portfolio risk and liquidity exposure.
    * Profit = Annual Fee + (Spending × Reward Rate) - Unpaid Amount
    * These customers are consistent spenders with low default ratios.
+```sql
+WITH total_spent_per_customer AS (
+    SELECT
+        customer_id,
+        SUM(amount) AS total_spent
+    FROM
+        transactions
+    GROUP BY
+        customer_id
+),
+unpaid_per_customer AS (
+    SELECT
+        customer_id,
+        SUM(amount_due - amount_paid) AS unpaid_amount
+    FROM
+        repayments
+    GROUP BY
+        customer_id
+),
+profit_calc AS (
+    SELECT
+        c.customer_id,
+        c.full_name,
+        cr.card_type,
+        cr.annual_fee,
+        cr.reward_rate,
+        COALESCE(tspc.total_spent, 0) AS total_spent,
+        COALESCE(upc.unpaid_amount, 0) AS unpaid_amount,
+        ROUND(
+            cr.annual_fee + (COALESCE(tspc.total_spent, 0) * cr.reward_rate) - COALESCE(upc.unpaid_amount, 0),
+            2
+        ) AS estimated_profit
+    FROM
+        customers c
+    JOIN
+        transactions t ON c.customer_id = t.customer_id
+    JOIN
+        cards cr ON t.card_id = cr.card_id
+    LEFT JOIN
+        total_spent_per_customer tspc ON c.customer_id = tspc.customer_id
+    LEFT JOIN
+        unpaid_per_customer upc ON c.customer_id = upc.customer_id
+    GROUP BY
+        c.customer_id, c.full_name, cr.card_type, cr.annual_fee, cr.reward_rate, tspc.total_spent, upc.unpaid_amount
+)
+SELECT * FROM profit_calc
+ORDER BY estimated_profit DESC
+LIMIT 10;
 
-8. **Group Contribution to Profit**
+```
+
+## 8. Customer-Level Profitability - income/age/region groups that contribute most to profit
+* Aggregates profits by income, region, and age – guiding strategic targeting.
+
+```sql
+WITH customer_profit AS (
+    SELECT
+        c.customer_id,
+        c.income_level,
+        c.age_group,
+        c.region,
+        cr.annual_fee + SUM(t.amount) * cr.reward_rate - COALESCE(SUM(r.amount_due - r.amount_paid), 0) AS estimated_profit
+    FROM
+        customers c
+    JOIN
+        transactions t ON c.customer_id = t.customer_id
+    JOIN
+        cards cr ON t.card_id = cr.card_id
+    LEFT JOIN
+        repayments r ON c.customer_id = r.customer_id
+    GROUP BY
+        c.customer_id, c.income_level, c.age_group, c.region, cr.annual_fee, cr.reward_rate
+)
+SELECT
+    income_level,
+    age_group,
+    region,
+    ROUND(SUM(estimated_profit), 2) AS total_profit,
+    COUNT(DISTINCT customer_id) AS customer_count,
+    ROUND(AVG(estimated_profit), 2) AS avg_profit_per_customer
+FROM
+    customer_profit
+GROUP BY
+    income_level, age_group, region
+ORDER BY
+    total_profit DESC;
+```
 
    * Urban, middle-aged, and upper-income groups contribute significantly to profit margins.
 
+---
 ### Segmentation & Recommendations
 
-9. **Customer Segments**
+## 9. **Customer Segmentation**
 
-   * Segmented into: High Spenders (On-time vs Late), Medium Spenders, Low Spenders.
+Categorizes customers by behavior:
 
-10. **Platinum Card Upgrade Targets**
-
+* High Spender, On-Time Payer
+* High Spender, Late Payer
+* Medium Spender
+* Low Spender
+```sql
+WITH usage_stats AS (
+    SELECT
+        c.customer_id,
+        COUNT(t.transaction_id) AS transaction_count,
+        SUM(t.amount) AS total_spent,
+        AVG(CASE WHEN r.repayment_date > r.due_date THEN 1 ELSE 0 END) AS late_payment_ratio
+    FROM
+        customers c
+    LEFT JOIN
+        transactions t ON c.customer_id = t.customer_id
+    LEFT JOIN
+        repayments r ON c.customer_id = r.customer_id
+    GROUP BY
+        c.customer_id
+)
+SELECT
+    customer_id,
+    transaction_count,
+    total_spent,
+    ROUND(late_payment_ratio, 2),
+    CASE
+        WHEN total_spent > 100000 AND late_payment_ratio < 0.2 THEN 'High Spender, On-time Payer'
+        WHEN total_spent > 100000 AND late_payment_ratio >= 0.2 THEN 'High Spender, Late Payer'
+        WHEN total_spent BETWEEN 50000 AND 100000 THEN 'Medium Spender'
+        ELSE 'Low Spender'
+    END AS segment
+FROM
+    usage_stats
+ORDER BY
+    total_spent DESC;
+```
+## 10. **Upgrade Recommendations**
+* Selects customers eligible for Platinum upgrade using filters like total spend, credit score, and repayment behavior.
 * High spenders with excellent credit scores and low late repayment ratios.
 
-11. **Regions Needing Financial Education or Credit Control**
+```sql
+WITH usage_stats AS (
+    SELECT
+        c.customer_id,
+        c.full_name,
+        c.income_level,
+        c.credit_score,
+        SUM(t.amount) AS total_spent,
+        AVG(CASE WHEN r.repayment_date > r.due_date THEN 1 ELSE 0 END) AS late_payment_ratio
+    FROM
+        customers c
+    LEFT JOIN
+        transactions t ON c.customer_id = t.customer_id
+    LEFT JOIN
+        repayments r ON c.customer_id = r.customer_id
+    GROUP BY
+        c.customer_id, c.full_name, c.income_level, c.credit_score
+)
+SELECT
+    customer_id,
+    full_name,
+    income_level,
+    credit_score,
+    total_spent,
+    ROUND(late_payment_ratio, 2) AS payment_ratio
+FROM
+    usage_stats
+WHERE
+    total_spent > 150000
+    AND credit_score > 700
+    AND late_payment_ratio < 0.1
+ORDER BY
+    total_spent DESC;
+```
+## 11. **Regions Needing Financial Education or Credit Control**
 
 * Regions with high overdue amounts and frequent late repayments need policy interventions.
+```sql
+SELECT
+    c.region,
+	SUM(r.amount_due - r.amount_paid) AS amount_overdue,
+    ROUND(AVG(CASE WHEN r.repayment_date > r.due_date THEN 1 ELSE 0 END), 2) AS avg_late_payment_ratio,
+    COUNT(DISTINCT c.customer_id) AS customer_count
+FROM customers c
+LEFT JOIN repayments r ON c.customer_id = r.customer_id
+GROUP BY c.region
+HAVING AVG(CASE WHEN r.repayment_date > r.due_date THEN 1 ELSE 0 END) > 0.3
+ORDER BY avg_late_payment_ratio DESC;
+```
 
-12. **Year-on-Year Spending Growth by Income Group**
+## 12. **Year-on-Year Spending Growth by Income Group**
 * Understand how each income group's credit usage is evolving to spot emerging segments.*
 
 ```sql
@@ -196,7 +431,7 @@ ORDER BY income_level, year;
 
 ---
 
-## 📌 Tools Used
+## Tools Used
 
 * PostgreSQL (via PgAdmin)
 * SQL (CTEs, Aggregations, CASE WHEN logic)
@@ -205,94 +440,16 @@ ORDER BY income_level, year;
 ---
 ## Author
 
-**Franklin Durueke**
-* Data Analyst | Financial Analysis | Business Intelligence
-📧 [duruekefranklin@gmail.com](mailto:duruekefranklin@gmail.com)
-🔗 [LinkedIn](https://www.linkedin.com/in/franklinanalytics/)
-💼 [Portfolio](https://franklinanalytics.github.io/portfolio/)
+### Franklin Durueke
+Data Analyst | Financial Analysis | Business Intelligence
+- 📧 [duruekefranklin@gmail.com](mailto:duruekefranklin@gmail.com)
+- 🔗 [LinkedIn](https://www.linkedin.com/in/franklinanalytics/)
+- 💼 [Portfolio](https://franklinanalytics.github.io/portfolio/)
 
 ---
 
-## ⭐ Final Thoughts
+## Final Thoughts
 
 This analysis simulates a robust financial analytics use case involving behavior segmentation, credit risk evaluation, and profitability analysis. It can be extended into dashboard development, ML credit scoring, or campaign recommendation systems.
 
 > 💬 *Feel free to fork, reuse, or contribute to this repository. Feedback and collaboration are welcome!*
-
----
-
-## 🔍 Key Queries & Insights
-
-### 1. **Spending by Region & Income Level**
-
-Analyzes total and average transaction values across regions and income groups to understand how wealth and location affect card usage.
-
-### 2. **Top Channels by Age Group & Card Type**
-
-Identifies whether mobile, POS, or online channels dominate usage by demographic – informing digital investment strategy.
-
-### 3. **Transaction Frequency & Size**
-
-Evaluates how frequently different segments transact and how much they spend, supporting segmentation.
-
-### 4. **Repeated Late Payments**
-
-Flags customers who miss due dates 3+ times – a credit risk metric used by lending teams.
-
-### 5. **Repayment Rates by Age Group**
-
-Benchmarks how well different age brackets repay their dues – e.g., Gen Z vs Gen X.
-
-### 6. **Unpaid Debt Over Time**
-
-Tracks growing debt month-over-month to assess portfolio risk and liquidity exposure.
-
-### 7. **Customer-Level Profitability**
-
-Estimates profitability by combining fees, rewards, and unpaid amounts – used to rank top 10 customers.
-
-### 8. **Group-Level Profitability**
-
-Aggregates profits by income, region, and age – guiding strategic targeting.
-
-### 9. **Customer Segmentation**
-
-Categorizes customers by behavior:
-
-* High Spender, On-Time Payer
-* High Spender, Late Payer
-* Medium Spender
-* Low Spender
-
-### 10. **Upgrade Recommendations**
-
-Selects customers eligible for Platinum upgrade using filters like total spend, credit score, and repayment behavior.
-
-### 11. **Region-Level Risk**
-
-Ranks regions with high overdue amounts and late payments to target financial education or policy tightening.
-
-### 12. **(New) Card Type Profitability Comparison**
-
-Compares average profit by card type to decide which cards are most financially viable for the bank.
-
-```sql
-SELECT 
-  card_type,
-  ROUND(AVG(annual_fee + total_spent * reward_rate - unpaid_amount), 2) AS avg_profit
-FROM (
-  SELECT
-    cr.card_type,
-    cr.annual_fee,
-    cr.reward_rate,
-    SUM(t.amount) AS total_spent,
-    SUM(r.amount_due - r.amount_paid) AS unpaid_amount
-  FROM cards cr
-  JOIN transactions t ON t.card_id = cr.card_id
-  JOIN repayments r ON t.customer_id = r.customer_id
-  GROUP BY cr.card_type, cr.annual_fee, cr.reward_rate
-) sub
-GROUP BY card_type
-ORDER BY avg_profit DESC;
-```
-
