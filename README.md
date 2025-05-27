@@ -1,12 +1,49 @@
 # Credit Card Usage Behavior & Profitability Analysis
 
-## 📊 Project Overview
+## Table of Contents
+
+1. [Project Overview](#project-overview)
+2. [Objectives](#objectives)
+3. [Business Context & Case Study](#business-context--case-study)
+4. [Project Structure](#project-structure)
+5. [Schema Design & Visuals](#schema-design)
+6. [Key Queries & Insights](#key-queries--insights)
+7. [Recommendations](#recommendations)
+8. [Visuals](#visuals)
+9. [How to Reproduce](#how-to-reproduce)
+10. [Author](#author)
+
+---
+## Project Overview
 
 This project analyzes customer behavior, repayment patterns, and profitability in a simulated credit card dataset using SQL. It provides insights into spending habits, repayment consistency, and identifies high-value customers using advanced query logic. The dataset and insights are tailored to reflect realistic banking scenarios in emerging economies like Nigeria.
 
 ---
+## Objectives
 
-## 📁 Project Structure
+* Understand customer spending behavior by demographic groups.
+* Identify high-risk and high-value customer segments
+* Evaluate profitability at customer and group level
+* Segment customers for better decision-making and targeted upgrades.
+
+---
+## Business Context & Case Study
+
+**Context:** A commercial bank operating across African regions has rolled out various card products. While card adoption is growing, profitability varies across customer segments. The bank wants to understand behavioral and financial patterns driving profitability and risk.
+
+**Challenge:** Despite high transaction volumes, some customers accumulate unpaid debt, while others transact heavily but generate minimal profit. Management needs clarity on which segments to target for growth and which to manage better.
+
+**Case Questions:**
+
+* Are high-income customers spending more or repaying on time?
+* Which channels and card types are most used by millennials or boomers?
+* Which regions pose the highest credit risk?
+* Who should be offered Platinum upgrades?
+
+This analysis provides answers using clean, structured SQL logic grounded in real-world banking scenarios.
+
+---
+## Project Structure
 
 ```
 ├── README.md
@@ -16,16 +53,29 @@ This project analyzes customer behavior, repayment patterns, and profitability i
 │   ├── customer_table.png   # Preview of customer table
 │   ├── repayment_table.png  # Preview of repayment table
 │   └── transaction_table.png# Preview of transaction table
+│
+├── datasets/
+│   ├── customers.csv
+│   ├── transactions.csv
+│   ├── repayments.csv
+│   └── cards.csv
 ```
+## 🧱 Schema Design
 
----
+**Tables Used:**
 
-## 📌 Objectives
+* `customers`: Contains customer demographics, region, income level, and credit score
+* `cards`: Stores card metadata – type, annual fee, reward rates
+* `transactions`: Records all spending activity (with channel info)
+* `repayments`: Logs actual repayments versus due amounts
 
-* Understand customer spending behavior by demographic groups.
-* Evaluate repayment discipline and risk indicators.
-* Estimate customer profitability using reward-based credit usage models.
-* Segment customers for better decision-making and targeted upgrades.
+Each table is connected via `customer_id` and `card_id` as appropriate.
+
+## 🖼️ Visuals
+
+| Customers Table                  | Transactions Table                     | Repayments Table                   |
+| -------------------------------- | -------------------------------------- | ---------------------------------- |
+| ![Customers](customer_table.png) | ![Transactions](transaction_table.png) | ![Repayments](repayment_table.png) |
 
 ---
 
@@ -167,3 +217,115 @@ Data Analyst | Finance-focused Analytics | Portfolio-ready Projects
 ## ⭐ Final Thoughts
 
 This analysis simulates a robust financial analytics use case involving behavior segmentation, credit risk evaluation, and profitability analysis. It can be extended into dashboard development, ML credit scoring, or campaign recommendation systems.
+
+
+
+
+
+## 🔍 Key Queries & Insights
+
+### 1. **Spending by Region & Income Level**
+
+Analyzes total and average transaction values across regions and income groups to understand how wealth and location affect card usage.
+
+### 2. **Top Channels by Age Group & Card Type**
+
+Identifies whether mobile, POS, or online channels dominate usage by demographic – informing digital investment strategy.
+
+### 3. **Transaction Frequency & Size**
+
+Evaluates how frequently different segments transact and how much they spend, supporting segmentation.
+
+### 4. **Repeated Late Payments**
+
+Flags customers who miss due dates 3+ times – a credit risk metric used by lending teams.
+
+### 5. **Repayment Rates by Age Group**
+
+Benchmarks how well different age brackets repay their dues – e.g., Gen Z vs Gen X.
+
+### 6. **Unpaid Debt Over Time**
+
+Tracks growing debt month-over-month to assess portfolio risk and liquidity exposure.
+
+### 7. **Customer-Level Profitability**
+
+Estimates profitability by combining fees, rewards, and unpaid amounts – used to rank top 10 customers.
+
+### 8. **Group-Level Profitability**
+
+Aggregates profits by income, region, and age – guiding strategic targeting.
+
+### 9. **Customer Segmentation**
+
+Categorizes customers by behavior:
+
+* High Spender, On-Time Payer
+* High Spender, Late Payer
+* Medium Spender
+* Low Spender
+
+### 10. **Upgrade Recommendations**
+
+Selects customers eligible for Platinum upgrade using filters like total spend, credit score, and repayment behavior.
+
+### 11. **Region-Level Risk**
+
+Ranks regions with high overdue amounts and late payments to target financial education or policy tightening.
+
+### 12. **(New) Card Type Profitability Comparison**
+
+Compares average profit by card type to decide which cards are most financially viable for the bank.
+
+```sql
+SELECT 
+  card_type,
+  ROUND(AVG(annual_fee + total_spent * reward_rate - unpaid_amount), 2) AS avg_profit
+FROM (
+  SELECT
+    cr.card_type,
+    cr.annual_fee,
+    cr.reward_rate,
+    SUM(t.amount) AS total_spent,
+    SUM(r.amount_due - r.amount_paid) AS unpaid_amount
+  FROM cards cr
+  JOIN transactions t ON t.card_id = cr.card_id
+  JOIN repayments r ON t.customer_id = r.customer_id
+  GROUP BY cr.card_type, cr.annual_fee, cr.reward_rate
+) sub
+GROUP BY card_type
+ORDER BY avg_profit DESC;
+```
+
+## ✅ Recommendations
+
+* **Offer Premium Upgrades**: Target high-spending, credit-worthy, on-time payers for Platinum upgrade.
+* **Risk Management**: Review credit limits or apply stricter controls in regions with >30% late payments.
+* **Customer Education**: Deploy campaigns in regions with low repayment performance.
+* **Channel Optimization**: Invest more in mobile and POS channels where young customers dominate.
+
+
+
+## 🧪 How to Reproduce
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/franklinanalytics/Credit-Card-Behavior-Analysis.git
+cd Credit-Card-Behavior-Analysis
+```
+
+2. Import the `schema_setup.sql` file into your PostgreSQL or pgAdmin environment
+3. Run the queries from `queries.sql`
+4. Review visuals and insights
+
+## 👤 Author
+
+**Franklin Durueke**
+Data Analyst | Financial Analysis | Business Intelligence
+🔗 [LinkedIn](https://www.linkedin.com/in/franklinanalytics/)
+📫 [franklinanalytics@gmail.com](mailto:franklinanalytics@gmail.com)
+
+---
+
+> 💬 *Feel free to fork, reuse, or contribute to this repository. Feedback and collaboration are welcome!*
